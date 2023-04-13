@@ -21,5 +21,4 @@ function Novo-UsuarioVeracode {
     catch {
         <#Do this if a terminating exception happens#>
     }
-    
 }
