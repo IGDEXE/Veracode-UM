@@ -3,11 +3,11 @@ param (
     $caminhoJSON
 )
 
-function Get-VeracodeUserID {
+function Check-VeracodeAPI {
     param (
-        $emailUsuario
+        $retornoAPI
     )
-    $infoUsuario = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/users?user_name=$emailUsuario" | ConvertFrom-Json
+    
     # Filtra a resposta
     $status = $retornoAPI.http_status
     $mensagem = $retornoAPI.message
@@ -25,8 +25,30 @@ function Get-VeracodeUserID {
         Write-Error $codigoErro
         exit
     } else {
-        $idUsuario = $infoUsuario._embedded.users.user_id
-        return $idUsuario
+        $validador = "OK"
+        return $validador
+    }
+}
+
+function Get-VeracodeUserID {
+    param (
+        $emailUsuario
+    )
+    $retornoAPI = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/users?user_name=$emailUsuario" | ConvertFrom-Json
+    $validador = Check-VeracodeAPI $retornoAPI
+
+    if ($validador -eq "OK") {
+        $idUsuario = $retornoAPI._embedded.users.user_id
+        if ($idUsuario) {
+            return $idUsuario
+        } else {
+            Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
+            exit
+        }
+        
+    } else {
+        Write-Error "Comportamento não esperado"
+        exit
     }
 }
 
