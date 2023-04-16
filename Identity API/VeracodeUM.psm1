@@ -4,52 +4,69 @@ $sobrenome = "Silva"
 $email = "prevendas+testeUM" + (Get-Date -Format sshhmmddMM) + "@m3corp.com.br"
 $cargo = "Desenvolvedor"
 $time = "DEMOs"
+$pastaModulos = Get-Location
+Import-Module -Name "$pastaModulos\Identity API\VeracodeUM.psm1" -Verbose
 
 # Lista de funções
 function New-VeracodeUser {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Caminho do arquivo JSON com os dados para criar um novo usuario")]
         $caminhoJSON
     )
 
     try {
         # Faz a chamada da API
         $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac POST "https://api.veracode.com/api/authn/v2/users"
+        $retornoAPI = $retornoAPI | ConvertFrom-Json
+        $validador = Debug-VeracodeAPI $retornoAPI
 
         # Valida se fez a criação
-        $retornoAPI = $retornoAPI | ConvertFrom-Json
-        $status = $retornoAPI.http_status
-        if ($status -eq "Bad Request") {
-        Write-Host "Ocorreu um erro:"
-        Write-Host $retornoAPI.message
+        if ($validador -eq "OK") {
+        # Pega as infos do usuario
+        $nomeUsuario = $retornoAPI.first_name
+        $sobrenomeUsuario = $retornoAPI.last_name
+        $emailUsuario = $retornoAPI.email_address
+        # Exibe a mensagem de confirmação
+        Write-Host "Usuario criado com sucesso:"
+        Write-Host "$nomeUsuario $sobrenomeUsuario"
+        Write-Host "$emailUsuario"
         } else {
-            # Pega as infos do usuario
-            $nomeUsuario = $retornoAPI.first_name
-            $sobrenomeUsuario = $retornoAPI.last_name
-            $emailUsuario = $retornoAPI.email_address
-            # Exibe a mensagem de confirmação
-            Write-Host "Usuario criado com sucesso:"
-            Write-Host "$nomeUsuario $sobrenomeUsuario"
-            Write-Host "$emailUsuario"
+            # Exibe a mensagem de erro
+            Write-Error "Algo não esperado ocorreu"
         }
     }
     catch {
         $ErrorMessage = $_.Exception.Message
         Write-Host "Erro no Powershell:"
-        Write-Host "$ErrorMessage"
+        Write-Error "$ErrorMessage"
     }
 }
 
 function Get-VeracodeTeamID {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Nome do time cadastrado na plataforma da Veracode")]
         $teamName
     )
+
     $infoTeam = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/teams?all_for_org=true&size=1000" | ConvertFrom-Json
-    $infoTeam = $infoTeam._embedded.teams
-    $teamID = ($infoTeam | Where-Object { $_.team_name -eq "$teamName" }).team_id
-    return $teamID
+    $validador = Debug-VeracodeAPI $infoTeam
+    if ($validador -eq "OK") {
+        $infoTeam = $infoTeam._embedded.teams
+        $teamID = ($infoTeam | Where-Object { $_.team_name -eq "$teamName" }).team_id
+        if ($teamID) {
+            return $teamID
+        } else {
+            # Exibe a mensagem de erro
+            Write-Error "Não foi encontrado ID para o Time: $teamName"
+        }
+        
+    } else {
+        # Exibe a mensagem de erro
+        Write-Error "Algo não esperado ocorreu"
+    }
 }
 
-function Generate-UserJson {
+function New-UserJson {
     param (
         $nome,
         $sobrenome,
@@ -93,7 +110,7 @@ function Generate-UserJson {
     catch {
         $ErrorMessage = $_.Exception.Message
         Write-Host "Erro no Powershell:"
-        Write-Host "$ErrorMessage"
+        Write-Error "$ErrorMessage"
     }
     
 }
@@ -106,8 +123,9 @@ function Block-VeracodeUser {
     
 }
 
-function Check-VeracodeAPI {
+function Debug-VeracodeAPI {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Retorno da API que quer analisar")]
         $retornoAPI
     )
     
@@ -133,10 +151,11 @@ function Check-VeracodeAPI {
 
 function Get-VeracodeUserID {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
         $emailUsuario
     )
     $retornoAPI = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/users?user_name=$emailUsuario" | ConvertFrom-Json
-    $validador = Check-VeracodeAPI $retornoAPI
+    $validador = Debug-VeracodeAPI $retornoAPI
 
     if ($validador -eq "OK") {
         $idUsuario = $retornoAPI._embedded.users.user_id
@@ -155,5 +174,5 @@ function Get-VeracodeUserID {
 
 # Teste funcoes
 # Cria usuario
-$caminhoJSON = Generate-UserJson $nome $sobrenome $email $cargo $time
-New-VeracodeUser $caminhoJSON
+#$caminhoJSON = New-UserJson $nome $sobrenome $email $cargo $time
+#New-VeracodeUser $caminhoJSON

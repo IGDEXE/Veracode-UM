@@ -2,36 +2,18 @@ param (
     $caminhoJSON
 )
 
-function Check-VeracodeAPI {
-    param (
-        $retornoAPI
-    )
-    
-    # Filtra a resposta
-    $status = $retornoAPI.http_status
-    $mensagem = $retornoAPI.message
-    $codigoErro = $retornoAPI.http_code
-
-    if ($status) {
-        Write-Host "Ocorreu um erro:"
-        Write-Host $mensagem
-        Write-Error $codigoErro
-        exit
-    } elseif (!$retornoAPI) {
-        Write-Host "Ocorreu um erro:"
-        Write-Error "A API não retornou nenhum dado"
-        exit
-    } else {
-        $validador = "OK"
-        return $validador
-    }
-}
+# Importa o modulo com as funcoes
+$pastaModulos = Get-Location
+$pastaAtual = Split-Path -Path (Get-Location) -Leaf
+$pastaModulos = $pastaModulos.path.split("\$pastaAtual")
+$pastaModulos = $pastaModulos[0]
+Import-Module -Name "$pastaModulos\VeracodeUM.psm1"
 
 try {
     # Faz a chamada da API
     $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac POST "https://api.veracode.com/api/authn/v2/users"
     $retornoAPI = $retornoAPI | ConvertFrom-Json
-    $validador = Check-VeracodeAPI $retornoAPI
+    $validador = Debug-VeracodeAPI $retornoAPI
 
     # Valida se fez a criação
     if ($validador -eq "OK") {
@@ -45,11 +27,11 @@ try {
        Write-Host "$emailUsuario"
     } else {
         # Exibe a mensagem de erro
-        Write-Host "Algo não esperado ocorreu"
+        Write-Error "Algo não esperado ocorreu"
     }
 }
 catch {
     $ErrorMessage = $_.Exception.Message
     Write-Host "Erro no Powershell:"
-    Write-Host "$ErrorMessage"
+    Write-Error "$ErrorMessage"
 }
