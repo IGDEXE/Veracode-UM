@@ -18,7 +18,7 @@ function Get-VeracodeTeamID {
 
 try {
     # Recebe as informações do template
-    $infoUser = Get-Content .\newUser.json | ConvertFrom-Json
+    $infoUser = Get-Content .\Templates\newUser.json | ConvertFrom-Json
 
     # Valida as roles pelo cargo
     if ($cargo -eq "Desenvolvedor") {

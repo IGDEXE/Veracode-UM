@@ -13,16 +13,14 @@ function Check-VeracodeAPI {
     $mensagem = $retornoAPI.message
     $codigoErro = $retornoAPI.http_code
 
-    if ($status -eq "Bad Request") {
+    if ($status) {
         Write-Host "Ocorreu um erro:"
         Write-Host $mensagem
         Write-Error $codigoErro
         exit
-    } if ($status -eq "Unauthorized") {
-        Write-Host "Erro de autenticação:"
-        Write-Host $mensagem
-        Write-Host "Favor entrar em contato com o suporte"
-        Write-Error $codigoErro
+    } elseif (!$retornoAPI) {
+        Write-Host "Ocorreu um erro:"
+        Write-Error "A API não retornou nenhum dado"
         exit
     } else {
         $validador = "OK"
