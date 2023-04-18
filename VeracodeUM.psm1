@@ -117,9 +117,35 @@ function New-UserJson {
 function Block-VeracodeUser {
     param (
         $emailUsuario,
-        $caminhoJSON
+        $caminhoJSON = ".\Templates\block.json"
     )
+
+    try {
+        # Recebe o ID com base no nome
+        $idUsuario = Get-VeracodeUserID $emailUsuario
     
+        # Faz o bloqueio
+        $urlAPI = "https://api.veracode.com/api/authn/v2/users/" + $idUsuario + "?partial=true"
+        $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac PUT "$urlAPI" | ConvertFrom-Json
+
+        $validador = Debug-VeracodeAPI $retornoAPI
+        if ($validador -eq "OK") {
+            $Usuario = $retornoAPI.user_name
+            if ($Usuario) {
+                Write-Host "Usuario $Usuario foi bloqueado"
+            } else {
+                Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
+            }
+            
+        } else {
+            Write-Error "Comportamento não esperado"
+        }
+    }
+    catch {
+        $ErrorMessage = $_.Exception.Message
+        Write-Host "Erro no Powershell:"
+        Write-Error "$ErrorMessage"
+    }
 }
 
 function Debug-VeracodeAPI {
@@ -151,19 +177,26 @@ function Get-VeracodeUserID {
         [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
         $emailUsuario
     )
-    $retornoAPI = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/users?user_name=$emailUsuario" | ConvertFrom-Json
-    $validador = Debug-VeracodeAPI $retornoAPI
-
-    if ($validador -eq "OK") {
-        $idUsuario = $retornoAPI._embedded.users.user_id
-        if ($idUsuario) {
-            return $idUsuario
+    try {
+        $infoUsers = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/users?size=1000" | ConvertFrom-Json
+        $validador = Debug-VeracodeAPI $infoUsers
+        if ($validador -eq "OK") {
+            $infoUsers = $infoUsers._embedded.users
+            $userID = ($infoUsers | Where-Object { $_.user_name -eq "$emailUsuario" }).user_id
+            if ($userID) {
+                return $userID
+            } else {
+                # Exibe a mensagem de erro
+                Write-Error "Não foi encontrado ID para o usuario: $emailUsuario"
+            }
+            
         } else {
-            Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
+            # Exibe a mensagem de erro
+            Write-Error "Algo não esperado ocorreu"
         }
-        
-    } else {
-        Write-Error "Comportamento não esperado"
+    }
+    catch {
+        <#Do this if a terminating exception happens#>
     }
 }
 
@@ -244,30 +277,37 @@ function Update-VeracodeUserRoles {
         [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
         $emailUsuario,
         [parameter(position=1,Mandatory=$True,HelpMessage="Tipo de roles desejado (ex: QA, SOC, Desenvolvedor)")]
-        $tipoFuncionario
+        $tipoFuncionario,
+        $pastaTemplates = ".\Templates"
     )
 
     # Recebe o ID do usuario e as roles
     $idUsuario = Get-VeracodeUserID $emailUsuario
     $roles = Get-VeracodeRoles $tipoFuncionario
-    $roles = ConvertTo-Json $roles
+
+    # Atualiza as roles com base no modelo
+    $infoUser = Get-Content "$pastaTemplates\extruturaRoles.json" | ConvertFrom-Json
+    $infoUser.roles = $roles
+
+    # Salva num novo JSON
+    $novoJSON = "roles" + (Get-Date -Format sshhmmddMM) + ".json"
+    $caminhoJSON = "./TEMP/$novoJSON"
+    $infoUser | ConvertTo-Json -depth 100 | Out-File "$caminhoJSON"
 
     # Atualiza as roles
-    $retornoAPI = $roles |http --auth-type=veracode_hmac PUT "https://api.veracode.com/api/authn/v2/users/$idUsuario?partial=true" | ConvertFrom-Json
+    $urlAPI = "https://api.veracode.com/api/authn/v2/users/" + $idUsuario + "?partial=true"
+    $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac PUT "$urlAPI" | ConvertFrom-Json
     $validador = Debug-VeracodeAPI $retornoAPI
-
     if ($validador -eq "OK") {
-        $idUsuario = $retornoAPI._embedded.users.user_id
-        if ($idUsuario) {
-            return $idUsuario
+        $Usuario = $retornoAPI.user_name
+        if ($Usuario) {
+            Write-Host "Usuario $Usuario foi atualizado"
         } else {
             Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
-            exit
         }
         
     } else {
         Write-Error "Comportamento não esperado"
-        exit
     }
     
 }
