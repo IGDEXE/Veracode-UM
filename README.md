@@ -13,9 +13,9 @@ Get-VeracodeTeamID - Pega o ID de um time com base no nome<br>
 Block-VeracodeUser - Bloqueia o usuário com base no email<br>
 New-UserJson - Cria o JSON para usar na New-VeracodeUser<br>
 Debug-VeracodeAPI - Valida o retorno da API<br>
-
-# Lista de funções mapeadas:
 New-VeracodeTeam - Criar um novo time<br>
 Get-VeracodeRoles - Pega a lista de roles com base no cargo<br>
+
+# Lista de funções mapeadas:
 Update-VeracodeUserRoles - Atualiza a lista de roles de um usuário<br>
 Delete-VeracodeUser - Deleta o usuário com base no email<br>

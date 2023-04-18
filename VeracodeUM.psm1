@@ -4,8 +4,10 @@ $sobrenome = "Silva"
 $email = "prevendas+testeUM" + (Get-Date -Format sshhmmddMM) + "@m3corp.com.br"
 $cargo = "Desenvolvedor"
 $time = "DEMOs"
+
+# Exemplo de como importar o modulo
 $pastaModulos = Get-Location
-Import-Module -Name "$pastaModulos\Identity API\VeracodeUM.psm1" -Verbose
+Import-Module -Name "$pastaModulos\VeracodeUM.psm1" -Verbose
 
 # Lista de funções
 function New-VeracodeUser {
@@ -73,7 +75,7 @@ function New-UserJson {
         $email,
         $cargo,
         $time,
-        $pastaTemplates = ".\Create\Templates"
+        $pastaTemplates = ".\Templates"
     )
 
     try {
@@ -81,11 +83,7 @@ function New-UserJson {
         $infoUser = Get-Content $pastaTemplates\newUser.json | ConvertFrom-Json
     
         # Valida as roles pelo cargo
-        if ($cargo -eq "Desenvolvedor") {
-            $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesDev
-        } if ($cargo -eq "gestor") {
-            $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesManager
-        }
+        $roles = Get-VeracodeRoles $cargo
     
         # Pega o ID do time
         $timeID = Get-VeracodeTeamID $time
@@ -104,8 +102,9 @@ function New-UserJson {
     
         # Salva num novo JSON
         $novoJSON = "user" + (Get-Date -Format sshhmmddMM) + ".json"
-        $infoUser | ConvertTo-Json -depth 100 | Out-File "$novoJSON"
-        return $novoJSON
+        $caminhoJSON = "./TEMP/$novoJSON"
+        $infoUser | ConvertTo-Json -depth 100 | Out-File "$caminhoJSON"
+        return $caminhoJSON
     }
     catch {
         $ErrorMessage = $_.Exception.Message
@@ -138,11 +137,9 @@ function Debug-VeracodeAPI {
         Write-Host "Ocorreu um erro:"
         Write-Host $mensagem
         Write-Error $codigoErro
-        exit
     } elseif (!$retornoAPI) {
         Write-Host "Ocorreu um erro:"
         Write-Error "A API não retornou nenhum dado"
-        exit
     } else {
         $validador = "OK"
         return $validador
@@ -163,6 +160,108 @@ function Get-VeracodeUserID {
             return $idUsuario
         } else {
             Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
+        }
+        
+    } else {
+        Write-Error "Comportamento não esperado"
+    }
+}
+
+function New-VeracodeTeam {
+    param (
+        $teamName,
+        $pastaTemplates = ".\Templates"
+    )
+
+    try {
+        # Recebe as informações do template
+        $timeTemplate = Get-Content $pastaTemplates\newTeam.json | ConvertFrom-Json
+    
+        # Altera as propriedades
+        $timeTemplate.team_name = $teamName
+    
+        # Salva num novo JSON
+        $novoJSON = "team" + (Get-Date -Format sshhmmddMM) + ".json"
+        $caminhoJSON = "./TEMP/$novoJSON"
+        $timeTemplate | ConvertTo-Json -depth 100 | Out-File "$caminhoJSON"
+        
+        # Cria o time 
+        $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac POST "https://api.veracode.com/api/authn/v2/teams"
+        $retornoAPI = $retornoAPI | ConvertFrom-Json
+        $validador = Debug-VeracodeAPI $retornoAPI
+
+        # Valida se fez a criação
+        if ($validador -eq "OK") {
+            # Pega as infos do usuario
+            $nomeTime = $retornoAPI.team_name
+            $idTime = $retornoAPI.team_id
+            # Exibe a mensagem de confirmação
+            Write-Host "Time criado com sucesso:"
+            Write-Host "$nomeTime"
+            Write-Host "$idTime"
+        } else {
+            # Exibe a mensagem de erro
+            Write-Error "Algo não esperado ocorreu"
+        }
+    }
+    catch {
+        $ErrorMessage = $_.Exception.Message
+        Write-Host "Erro no Powershell:"
+        Write-Error "$ErrorMessage"
+    }
+}
+
+function Get-VeracodeRoles {
+    param (
+        $tipoFuncionario,
+        $pastaTemplates = ".\Templates"
+    )
+
+    try {
+        # Valida as roles pelo cargo
+        switch ($tipoFuncionario) {
+            Desenvolvedor { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesDev; Break }
+            QA { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesQa; Break }
+            SOC { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesSoc; Break }
+            DEVOPS { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesSRE; Break }
+            BLUETEAM { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesBlueTeam; Break }
+            Default { Write-Error "Não foi encontrado nenhum perfil para $tipoFuncionario"}
+        }
+
+        # Retorna as roles
+        return $roles
+    }
+    catch {
+        $ErrorMessage = $_.Exception.Message
+        Write-Host "Erro no Powershell:"
+        Write-Error "$ErrorMessage"
+    }
+    
+}
+
+function Update-VeracodeUserRoles {
+    param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
+        $emailUsuario,
+        [parameter(position=1,Mandatory=$True,HelpMessage="Tipo de roles desejado (ex: QA, SOC, Desenvolvedor)")]
+        $tipoFuncionario
+    )
+
+    # Recebe o ID do usuario e as roles
+    $idUsuario = Get-VeracodeUserID $emailUsuario
+    $roles = Get-VeracodeRoles $tipoFuncionario
+    $roles = ConvertTo-Json $roles
+
+    # Atualiza as roles
+    $retornoAPI = $roles |http --auth-type=veracode_hmac PUT "https://api.veracode.com/api/authn/v2/users/$idUsuario?partial=true" | ConvertFrom-Json
+    $validador = Debug-VeracodeAPI $retornoAPI
+
+    if ($validador -eq "OK") {
+        $idUsuario = $retornoAPI._embedded.users.user_id
+        if ($idUsuario) {
+            return $idUsuario
+        } else {
+            Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
             exit
         }
         
@@ -170,6 +269,7 @@ function Get-VeracodeUserID {
         Write-Error "Comportamento não esperado"
         exit
     }
+    
 }
 
 # Teste funcoes
