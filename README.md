@@ -8,20 +8,20 @@ pip install veracode-api-signing<br>
 
 # Lista de funções implementadas:
 New-VeracodeUser - Criar novos usuários<br>
+New-UserJson - Cria o JSON para usar na New-VeracodeUser<br>
+New-VeracodeTeam - Criar um novo time<br>
 Get-VeracodeUserID - Pega o ID de um usuário com base no email<br>
 Get-VeracodeTeamID - Pega o ID de um time com base no nome<br>
-Block-VeracodeUser - Bloqueia o usuário com base no email<br>
-New-UserJson - Cria o JSON para usar na New-VeracodeUser<br>
-Debug-VeracodeAPI - Valida o retorno da API<br>
-New-VeracodeTeam - Criar um novo time<br>
 Get-VeracodeRoles - Pega a lista de roles com base no cargo<br>
+Block-VeracodeUser - Bloqueia o usuário com base no email<br>
+Debug-VeracodeAPI - Valida o retorno da API<br>
 Update-VeracodeUserRoles - Atualiza a lista de roles de um usuário<br>
 Remove-VeracodeUser - Deleta o usuário com base no email<br>
 
 # Como usar?
 Faça a importação do modulo VeracodeUM.psm1 no Powershell<br>
 Reaproveite as funções em seus próprios scripts<br>
-Caso queira usar num formato de scripts, use os nas pastas correspondentes<br>
+Caso queira usar num formato de scripts, use os das pastas correspondentes<br>
 
 # Como usar no Linux?
 Recomendo que consulte a documentação para verificar todos os detalhes:<br>
