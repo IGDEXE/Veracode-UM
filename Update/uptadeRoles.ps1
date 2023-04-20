@@ -1,10 +1,13 @@
 param (
-    [parameter(position=0,Mandatory=$True,HelpMessage="Email do usuario")]
+    [parameter(position = 0, Mandatory = $True, HelpMessage = "Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
     $emailUsuario,
-    [parameter(position=1,HelpMessage="Caminho para o template JSON")]
-    $caminhoJSON = ".\block.json"
+    [parameter(position = 1, Mandatory = $True, HelpMessage = "Tipo de roles desejado (ex: QA, SOC, Desenvolvedor)")]
+    $tipoFuncionario,
+    [parameter(position = 2, HelpMessage = "Caminho da pasta de templates")]
+    $pastaTemplates = ".\Templates"
 )
 
+# Lista de funcoes:
 function Debug-VeracodeAPI {
     param (
         [parameter(position=0,Mandatory=$True,HelpMessage="Retorno da API que quer analisar")]
@@ -35,7 +38,6 @@ function Debug-VeracodeAPI {
         Write-Host "$ErrorMessage"
     }
 }
-
 function Get-VeracodeUserID {
     param (
         [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
@@ -65,29 +67,69 @@ function Get-VeracodeUserID {
         Write-Host "$ErrorMessage"
     }
 }
+function Get-VeracodeRoles {
+    param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Nome do cargo conforme estabelecido no template")]
+        $tipoFuncionario,
+        [parameter(position=1,HelpMessage="Caminho da pasta de templates")]
+        $pastaTemplates = ".\Templates"
+    )
+
+    try {
+        # Valida as roles pelo cargo
+        switch ($tipoFuncionario) {
+            Desenvolvedor { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesDev; Break }
+            QA { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesQa; Break }
+            SOC { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesSoc; Break }
+            DEVOPS { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesSRE; Break }
+            BLUETEAM { $roles = (Get-Content $pastaTemplates\exemploRoles.json | ConvertFrom-Json).rolesBlueTeam; Break }
+            Default { Write-Error "Não foi encontrado nenhum perfil para $tipoFuncionario"}
+        }
+
+        # Retorna as roles
+        return $roles
+    }
+    catch {
+        $ErrorMessage = $_.Exception.Message
+        Write-Host "Erro no Powershell:"
+        Write-Error "$ErrorMessage"
+    }   
+}
 
 try {
-    # Recebe o ID com base no nome
+    # Recebe o ID do usuario e as roles
     $idUsuario = Get-VeracodeUserID $emailUsuario
-    
-    # Faz o bloqueio
+    $roles = Get-VeracodeRoles $tipoFuncionario
+
+    # Atualiza as roles com base no modelo
+    $infoUser = Get-Content "$pastaTemplates\extruturaRoles.json" | ConvertFrom-Json
+    $infoUser.roles = $roles
+
+    # Salva num novo JSON
+    $novoJSON = "roles" + (Get-Date -Format sshhmmddMM) + ".json"
+    $caminhoJSON = "./TEMP/$novoJSON"
+    $infoUser | ConvertTo-Json -depth 100 | Out-File "$caminhoJSON"
+
+    # Atualiza as roles
     $urlAPI = "https://api.veracode.com/api/authn/v2/users/" + $idUsuario + "?partial=true"
     $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac PUT "$urlAPI" | ConvertFrom-Json
-
     $validador = Debug-VeracodeAPI $retornoAPI
     if ($validador -eq "OK") {
         $Usuario = $retornoAPI.user_name
         if ($Usuario) {
-            Write-Host "Usuario $Usuario foi bloqueado"
-        } else {
+            Write-Host "Usuario $Usuario foi atualizado"
+        }
+        else {
             Write-Error "Não foi localizado nenhum ID para: $emailUsuario"
         }
-        
-    } else {
+            
+    }
+    else {
         Write-Error "Comportamento não esperado"
     }
-} catch {
+}
+catch {
     $ErrorMessage = $_.Exception.Message
     Write-Host "Erro no Powershell:"
-    Write-Host "$ErrorMessage"
+    Write-Error "$ErrorMessage"
 }

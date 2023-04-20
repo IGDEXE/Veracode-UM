@@ -3,23 +3,45 @@ param (
         $sobrenome,
         $email,
         $cargo,
-        $time
+        $time,
+        $pastaTemplates = ".\Templates"
     )
 
 # Lista de funcoes
 function Get-VeracodeTeamID {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Nome do time cadastrado na plataforma da Veracode")]
         $teamName
     )
-    $infoTeam = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/teams?all_for_org=true&size=1000" | ConvertFrom-Json
-    $infoTeam = $infoTeam._embedded.teams
-    $teamID = ($infoTeam | Where-Object { $_.team_name -eq "$teamName" }).team_id
-    return $teamID
+
+    try {
+        $infoTeam = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/teams?all_for_org=true&size=1000" | ConvertFrom-Json
+        $validador = Debug-VeracodeAPI $infoTeam
+        if ($validador -eq "OK") {
+            $infoTeam = $infoTeam._embedded.teams
+            $teamID = ($infoTeam | Where-Object { $_.team_name -eq "$teamName" }).team_id
+            if ($teamID) {
+                return $teamID
+            } else {
+                # Exibe a mensagem de erro
+                Write-Error "Não foi encontrado ID para o Time: $teamName"
+            }
+            
+        } else {
+            # Exibe a mensagem de erro
+            Write-Error "Algo não esperado ocorreu"
+        }
+    }
+    catch {
+        $ErrorMessage = $_.Exception.Message
+        Write-Host "Erro no Powershell:"
+        Write-Error "$ErrorMessage"
+    }  
 }
 
 try {
     # Recebe as informações do template
-    $infoUser = Get-Content .\newUser.json | ConvertFrom-Json
+    $infoUser = Get-Content $pastaTemplates\newUser.json | ConvertFrom-Json
 
     # Valida as roles pelo cargo
     if ($cargo -eq "Desenvolvedor") {
