@@ -1,13 +1,13 @@
 # Valores de teste
-$nome = "Joao"
-$sobrenome = "Silva"
-$email = "prevendas+testeUM" + (Get-Date -Format sshhmmddMM) + "@m3corp.com.br"
-$cargo = "Desenvolvedor"
-$time = "DEMOs"
+# $nome = "Joao"
+# $sobrenome = "Silva"
+# $email = "prevendas+testeUM" + (Get-Date -Format sshhmmddMM) + "@m3corp.com.br"
+# $cargo = "Desenvolvedor"
+# $time = "DEMOs"
 
 # Exemplo de como importar o modulo
-$pastaModulos = Get-Location
-Import-Module -Name "$pastaModulos\VeracodeUM.psm1" -Verbose
+# $pastaModulos = Get-Location
+# Import-Module -Name "$pastaModulos\VeracodeUM.psm1" -Verbose
 
 # Lista de funções
 function New-VeracodeUser {
@@ -70,11 +70,17 @@ function Get-VeracodeTeamID {
 
 function New-UserJson {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Nome do usuario")]
         $nome,
+        [parameter(position=1,Mandatory=$True,HelpMessage="Sobrenome do usuario")]
         $sobrenome,
+        [parameter(position=2,Mandatory=$True,HelpMessage="Email do usuario")]
         $email,
+        [parameter(position=3,Mandatory=$True,HelpMessage="Cargo do usuario")]
         $cargo,
+        [parameter(position=4,Mandatory=$True,HelpMessage="Equipe do usuario")]
         $time,
+        [parameter(position=5,HelpMessage="Caminho para os templates")]
         $pastaTemplates = ".\Templates"
     )
 
@@ -116,7 +122,9 @@ function New-UserJson {
 
 function Block-VeracodeUser {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Email do usuario")]
         $emailUsuario,
+        [parameter(position=1,HelpMessage="Caminho para o template JSON")]
         $caminhoJSON = ".\Templates\block.json"
     )
 
@@ -202,7 +210,9 @@ function Get-VeracodeUserID {
 
 function New-VeracodeTeam {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Nome da equipe")]
         $teamName,
+        [parameter(position=1,HelpMessage="Caminho da pasta de templates")]
         $pastaTemplates = ".\Templates"
     )
 
@@ -246,7 +256,9 @@ function New-VeracodeTeam {
 
 function Get-VeracodeRoles {
     param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Nome do cargo conforme estabelecido no template")]
         $tipoFuncionario,
+        [parameter(position=1,HelpMessage="Caminho da pasta de templates")]
         $pastaTemplates = ".\Templates"
     )
 
@@ -278,6 +290,7 @@ function Update-VeracodeUserRoles {
         $emailUsuario,
         [parameter(position=1,Mandatory=$True,HelpMessage="Tipo de roles desejado (ex: QA, SOC, Desenvolvedor)")]
         $tipoFuncionario,
+        [parameter(position=2,HelpMessage="Caminho da pasta de templates")]
         $pastaTemplates = ".\Templates"
     )
 
@@ -312,7 +325,37 @@ function Update-VeracodeUserRoles {
     
 }
 
-# Teste funcoes
-# Cria usuario
-#$caminhoJSON = New-UserJson $nome $sobrenome $email $cargo $time
-#New-VeracodeUser $caminhoJSON
+function Remove-VeracodeUser {
+    param (
+        [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
+        $emailUsuario
+    )
+    
+    try {
+        # Recebe o ID com base no nome
+        $idUsuario = Get-VeracodeUserID $emailUsuario
+    
+        # Deleta o usuario
+        $retornoAPI = http --auth-type=veracode_hmac DELETE "https://api.veracode.com/api/authn/v2/users/$idUsuario" | ConvertFrom-Json
+        if ($retornoAPI) {
+            Debug-VeracodeAPI $retornoAPI
+        } else {
+            Write-Host "Usuario $emailUsuario foi deletado"
+        }
+    }
+    catch {
+        $ErrorMessage = $_.Exception.Message
+        Write-Host "Erro no Powershell:"
+        Write-Host "$ErrorMessage"
+    }
+}
+
+# Teste de funções
+# $caminhoJSON = New-UserJson $nome $sobrenome $email $cargo $time
+# New-VeracodeUser $caminhoJSON
+# Update-VeracodeUserRoles $emailUsuario $tipoFuncionario
+# Block-VeracodeUser $emailUsuario
+# Remove-VeracodeUser $emailUsuario
+# $novoTime = "UM-Teste-" + (Get-Date -Format sshhmmddMM)
+# New-VeracodeTeam "$novoTime"
+# Get-VeracodeTeamID $novoTime

@@ -14,7 +14,12 @@ try {
     $idUsuario = Get-VeracodeUserID $emailUsuario
 
     # Deleta o usuario
-    http --auth-type=veracode_hmac DELETE "https://api.veracode.com/api/authn/v2/users/$idUsuario"
+    $retornoAPI = http --auth-type=veracode_hmac DELETE "https://api.veracode.com/api/authn/v2/users/$idUsuario" | ConvertFrom-Json
+    if ($retornoAPI) {
+        Debug-VeracodeAPI $retornoAPI
+    } else {
+        Write-Host "Usuario $emailUsuario foi deletado"
+    }
 }
 catch {
     $ErrorMessage = $_.Exception.Message
