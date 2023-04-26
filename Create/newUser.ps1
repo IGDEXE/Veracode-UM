@@ -34,36 +34,6 @@ function Debug-VeracodeAPI {
     }
 }
 
-function Get-VeracodeUserID {
-    param (
-        [parameter(position=0,Mandatory=$True,HelpMessage="Email da conta conforme cadastrado na Veracode (Caso seja uma conta de API, informar o UserName dela)")]
-        $emailUsuario
-    )
-    try {
-        $infoUsers = http --auth-type=veracode_hmac GET "https://api.veracode.com/api/authn/v2/users?size=1000" | ConvertFrom-Json
-        $validador = Debug-VeracodeAPI $infoUsers
-        if ($validador -eq "OK") {
-            $infoUsers = $infoUsers._embedded.users
-            $userID = ($infoUsers | Where-Object { $_.user_name -eq "$emailUsuario" }).user_id
-            if ($userID) {
-                return $userID
-            } else {
-                # Exibe a mensagem de erro
-                Write-Error "Não foi encontrado ID para o usuario: $emailUsuario"
-            }
-            
-        } else {
-            # Exibe a mensagem de erro
-            Write-Error "Algo não esperado ocorreu"
-        }
-    }
-    catch {
-        $ErrorMessage = $_.Exception.Message
-        Write-Host "Erro no Powershell:"
-        Write-Host "$ErrorMessage"
-    }
-}
-
 try {
     # Faz a chamada da API
     $retornoAPI = Get-Content $caminhoJSON | http --auth-type=veracode_hmac POST "https://api.veracode.com/api/authn/v2/users"
